@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# RADAS OIL development artifacts
+*.zip
+*.ps1
+*.backup
+*-backup
+*.patch*-backup
