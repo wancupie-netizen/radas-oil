@@ -1,0 +1,750 @@
+# RADAS OIL --- Economy V1
+
+**Status:** Working Economy Specification\
+**Version:** 1.0\
+**Purpose:** Baseline economy for prototype, simulation, balancing, and
+future GitHub development.
+
+> RADAS OIL is designed as a free-to-start, pay-to-accelerate oil tycoon
+> economy. Capital buys faster progression and stronger production
+> assets; it does not guarantee profit or a fixed SOL return.
+
+------------------------------------------------------------------------
+
+## 1. Core Economy
+
+The V1 economy uses three layers:
+
+``` text
+OIL (BBL)
+   ↓
+Sell / Process
+   ↓
+RDO
+   ↓
+Spend / Burn / Upgrade / Reward Eligibility
+   ↓
+SOL Reward Pool
+```
+
+### OIL / BBL
+
+OIL is the primary in-game resource produced by Oil Wells.
+
+-   Produced by wells.
+-   Stored in player storage.
+-   Sold for RDO.
+-   Used by selected upgrades or operating systems.
+-   Does **not** have a fixed SOL value.
+
+### RDO
+
+RDO is the game reward and utility currency.
+
+Main uses:
+
+-   Mint/build new wells.
+-   Upgrade wells.
+-   Repair wells.
+-   Upgrade storage/platform.
+-   Pay selected operating costs.
+-   Determine eligibility for future SOL rewards.
+
+RDO spent on minting, repairs, and selected upgrades should be treated
+as an economic sink/burn.
+
+### SOL
+
+SOL is the external reward/liquidity layer.
+
+V1 rule:
+
+**OIL and RDO must never have a permanently guaranteed fixed conversion
+to SOL.**
+
+SOL rewards are distributed from a limited Reward Pool according to the
+health and revenue of the ecosystem.
+
+------------------------------------------------------------------------
+
+# 2. Player Entry Models
+
+RADAS OIL supports two starting routes.
+
+## Free Player
+
+**Entry Cost:** USD 0
+
+Receives:
+
+  Item                Specification
+  ------------------- ----------------------------
+  Starting Asset      Starter Well
+  Well Value          Non-tradable starter asset
+  Starting Storage    100 BBL
+  Starting RDO        0
+  Output              5 BBL / cycle
+  Cycle               2 hours
+  Durability          100
+  Tradable            No
+  Upgradeable         Yes
+  SOL Reward Access   Locked initially
+
+Purpose:
+
+The Starter Well allows anyone to learn the game and slowly build an oil
+operation without depositing money.
+
+``` text
+FREE
+ ↓
+Starter Well
+ ↓
+Mine Oil
+ ↓
+Sell Oil
+ ↓
+Earn RDO
+ ↓
+Upgrade
+ ↓
+Build/Mint Standard Well
+```
+
+The free route must remain viable, but intentionally slower than the
+capital route.
+
+------------------------------------------------------------------------
+
+## USD 100 Player
+
+**Entry Target:** approximately USD 100 equivalent
+
+Receives/builds:
+
+  Item                 Specification
+  -------------------- ----------------------------------------------
+  Starting Asset       Standard Well
+  Target Entry Value   USD 100 equivalent
+  Starting Storage     500 BBL
+  Output               30 BBL / cycle
+  Cycle                2 hours
+  Durability           100
+  Tradable             Future phase
+  Upgradeable          Yes
+  SOL Reward Access    Eligible after minimum activity requirements
+
+``` text
+≈ USD 100
+    ↓
+Standard Well
+    ↓
+Faster Oil Production
+    ↓
+Sell Oil
+    ↓
+RDO
+    ↓
+Repair / Upgrade / New Well
+    ↓
+Reward Eligibility
+```
+
+**Design principle:**
+
+> Capital buys speed and productive capacity. It does not buy guaranteed
+> profit.
+
+------------------------------------------------------------------------
+
+# 3. Starter Oil Price
+
+Initial simulation price:
+
+**1 BBL = 0.01 RDO**
+
+Examples:
+
+          Oil         RDO
+  ----------- -----------
+        5 BBL    0.05 RDO
+       30 BBL    0.30 RDO
+      100 BBL    1.00 RDO
+    1,000 BBL   10.00 RDO
+
+This is an internal game price for Economy V1.
+
+It is **not** a promise that RDO has a fixed USD or SOL value.
+
+Future versions may introduce a controlled dynamic oil market.
+
+------------------------------------------------------------------------
+
+# 4. Oil Well Classes
+
+V1 uses four production classes plus the free Starter Well.
+
+  -------------------------------------------------------------------------------
+  Well         Rarity/Class         Output        Cycle    Max Daily   Durability
+                                                               Gross 
+                                                            Output\* 
+  ------------ -------------- ------------ ------------ ------------ ------------
+  Starter Well Starter               5 BBL           2h       60 BBL          100
+
+  Standard     Common               30 BBL           2h      360 BBL          100
+  Well                                                               
+
+  Industrial   Uncommon             75 BBL           3h      600 BBL          120
+  Well                                                               
+
+  Deep Sea     Rare                180 BBL           4h    1,080 BBL          150
+  Well                                                               
+
+  Ultra Deep   Legendary           450 BBL           6h    1,800 BBL          200
+  Well                                                               
+  -------------------------------------------------------------------------------
+
+\*Theoretical maximum assumes every cycle is collected immediately.
+Actual player output will normally be lower.
+
+Rarity is primarily a progression class in V1.
+
+**V1 should not use paid randomized loot-box minting.**
+
+Players should know what production asset they are purchasing/building.
+
+------------------------------------------------------------------------
+
+# 5. Mint / Build Well Cost
+
+In V1, `MINT WELL` means creating a unique productive game asset.
+
+Blockchain minting is **not required** for the first implementation.
+
+Each minted well should eventually have:
+
+``` text
+well_id
+owner_id
+well_type
+level
+output
+cycle
+durability
+created_at
+status
+```
+
+Proposed costs:
+
+  Asset                RDO Cost   Oil Requirement   External Purchase Target
+  ----------------- ----------- ----------------- --------------------------
+  Starter Well             Free                 0                        \$0
+  Standard Well         100 RDO         1,000 BBL             ≈ \$100 option
+  Industrial Well       450 RDO         5,000 BBL    Not sold directly in V1
+  Deep Sea Well       1,500 RDO        15,000 BBL    Not sold directly in V1
+  Ultra Deep Well     5,000 RDO        50,000 BBL    Not sold directly in V1
+
+The USD 100 route gives the player access to a known **Standard Well**,
+not a random rarity.
+
+Higher classes should primarily be earned through gameplay progression
+and upgrading.
+
+------------------------------------------------------------------------
+
+# 6. Durability
+
+Every production cycle consumes durability.
+
+  Well           Durability Loss / Completed Cycle
+  ------------ -----------------------------------
+  Starter                                        2
+  Standard                                       2
+  Industrial                                     3
+  Deep Sea                                       4
+  Ultra Deep                                     5
+
+When durability reaches zero:
+
+``` text
+WELL STATUS
+OFFLINE — REPAIR REQUIRED
+```
+
+The well stops producing until repaired.
+
+This creates a permanent economic sink and prevents production from
+being completely cost-free.
+
+------------------------------------------------------------------------
+
+# 7. Repair Cost
+
+Initial repair formula:
+
+``` text
+Repair Cost = Missing Durability × Repair Rate
+```
+
+Proposed repair rates:
+
+  Well           RDO / Missing Durability
+  ------------ --------------------------
+  Starter                        0.01 RDO
+  Standard                       0.05 RDO
+  Industrial                     0.10 RDO
+  Deep Sea                       0.20 RDO
+  Ultra Deep                     0.40 RDO
+
+Example:
+
+Standard Well has:
+
+``` text
+Durability: 60 / 100
+Missing: 40
+
+40 × 0.05 RDO
+= 2 RDO repair cost
+```
+
+Repair RDO is removed from circulation.
+
+------------------------------------------------------------------------
+
+# 8. Well Upgrade Costs
+
+Each well begins at Level 1.
+
+Initial V1 progression:
+
+  Upgrade               Cost Multiplier   Output Increase   Cycle Improvement
+  ------------- ----------------------- ----------------- -------------------
+  Level 1 → 2      25% of base mint RDO              +15%                None
+  Level 2 → 3      50% of base mint RDO              +20%                 -5%
+  Level 3 → 4     100% of base mint RDO              +25%                 -5%
+  Level 4 → 5     200% of base mint RDO              +35%                -10%
+
+Example Standard Well:
+
+Base mint cost = 100 RDO.
+
+``` text
+LV1 → LV2 = 25 RDO
+LV2 → LV3 = 50 RDO
+LV3 → LV4 = 100 RDO
+LV4 → LV5 = 200 RDO
+```
+
+Total upgrade cost:
+
+**375 RDO**
+
+Level 5 is the initial V1 maximum.
+
+A later prestige/class upgrade can transform a max-level Standard Well
+into a higher production class.
+
+------------------------------------------------------------------------
+
+# 9. Storage Progression
+
+Oil that exceeds storage capacity cannot be collected.
+
+This forces players to balance production and infrastructure.
+
+  Storage Level       Capacity   Upgrade Cost
+  --------------- ------------ --------------
+  LV1                  100 BBL           Free
+  LV2                  500 BBL         10 RDO
+  LV3                1,500 BBL         35 RDO
+  LV4                5,000 BBL        100 RDO
+  LV5               15,000 BBL        300 RDO
+
+USD 100 Standard Well players may begin with 500 BBL capacity so the
+purchased asset is immediately usable.
+
+------------------------------------------------------------------------
+
+# 10. Daily Reward Limit
+
+The game must separate **production** from **external rewards**.
+
+A player can continue producing OIL/RDO according to game rules, but
+external SOL distribution is limited by the Reward Pool.
+
+## Initial V1 Safety Rule
+
+No account may claim more than:
+
+**0.05 SOL per 24 hours**
+
+during the earliest public economy test.
+
+This is a **maximum cap**, not a promised daily payment.
+
+Actual claim:
+
+``` text
+Actual SOL Reward
+=
+MIN(
+    Player Reward Share,
+    Available Reward Pool,
+    Daily Player Cap
+)
+```
+
+Therefore:
+
+``` text
+Daily cap = 0.05 SOL
+```
+
+does **not** mean:
+
+``` text
+Player earns 0.05 SOL every day
+```
+
+The real reward may be lower or zero.
+
+The cap must be configurable by the project rather than hard-coded
+permanently.
+
+------------------------------------------------------------------------
+
+# 11. SOL Reward Pool
+
+SOL rewards must come from a finite ecosystem reserve.
+
+Potential future sources:
+
+-   Standard Well purchases.
+-   Marketplace fees.
+-   Premium upgrades.
+-   Cosmetic purchases.
+-   Season passes.
+-   Platform fees.
+-   Treasury allocation.
+-   Other genuine game revenue.
+
+Concept:
+
+``` text
+GAME REVENUE
+     ↓
+Treasury Allocation
+     ↓
+SOL Reward Pool
+     ↓
+Eligible Players
+```
+
+The exact treasury percentages are **not locked in Economy V1**.
+
+They must be determined after simulation.
+
+------------------------------------------------------------------------
+
+# 12. Reward Eligibility
+
+To reduce farming abuse, holding RDO alone should not automatically
+create a SOL claim.
+
+A player should need qualifying game activity.
+
+Proposed requirements:
+
+``` text
+Active Well
++
+Minimum account age
++
+Minimum production activity
++
+Minimum RDO threshold
++
+No anti-abuse flags
+=
+Reward Eligible
+```
+
+Suggested first test:
+
+  Requirement                     V1 Proposal
+  ------------------------ ------------------
+  Account Age                          7 days
+  Active Production Days                    5
+  Minimum RDO Earned                   10 RDO
+  Minimum Well               Starter accepted
+  Daily Claim                      Once / 24h
+
+These parameters remain configurable during testing.
+
+------------------------------------------------------------------------
+
+# 13. Economic Sinks
+
+RADAS OIL requires continuous reasons to spend resources.
+
+Primary V1 sinks:
+
+``` text
+RDO
+├── Mint Well
+├── Repair Well
+├── Upgrade Well
+├── Upgrade Storage
+└── Future Platform Upgrade
+
+OIL
+├── Mint requirements
+├── Future fuel/energy
+└── Future processing
+```
+
+Without sufficient sinks:
+
+``` text
+More Players
+   ↓
+More Production
+   ↓
+More RDO
+   ↓
+More Sell Pressure
+   ↓
+Economy Weakens
+```
+
+Therefore production expansion must always create additional operating
+or progression costs.
+
+------------------------------------------------------------------------
+
+# 14. Free vs USD 100 Progression
+
+## Free Route
+
+``` text
+START FREE
+   ↓
+Starter Well
+5 BBL / 2h
+   ↓
+Collect
+   ↓
+Storage
+   ↓
+Sell Oil
+   ↓
+RDO
+   ↓
+Repair + Upgrade
+   ↓
+Accumulate Resources
+   ↓
+Mint Standard Well
+   ↓
+Enter Main Economy
+```
+
+Free players contribute time and activity.
+
+Their route is deliberately slower but must remain achievable.
+
+## USD 100 Route
+
+``` text
+≈ USD 100
+   ↓
+Standard Well
+30 BBL / 2h
+   ↓
+Collect
+   ↓
+Storage
+   ↓
+Sell Oil
+   ↓
+RDO
+   ↓
+Repair / Upgrade / Mint
+   ↓
+Higher Production
+```
+
+Paid players skip the slow bootstrap stage.
+
+They do **not** receive guaranteed ROI or guaranteed SOL yield.
+
+------------------------------------------------------------------------
+
+# 15. Core Gameplay Loop
+
+``` text
+MINT / BUILD WELL
+        ↓
+      PRODUCE
+        ↓
+       WAIT
+        ↓
+      COLLECT
+        ↓
+      STORAGE
+        ↓
+       SELL
+        ↓
+        RDO
+      ↙     ↘
+   SPEND    SAVE
+     ↓        ↓
+REPAIR /   NEW WELL
+UPGRADE
+     ↓
+STRONGER PRODUCTION
+```
+
+Optional external reward layer:
+
+``` text
+QUALIFY
+   ↓
+REWARD SHARE
+   ↓
+SOL REWARD POOL
+   ↓
+CLAIM
+```
+
+------------------------------------------------------------------------
+
+# 16. V1 Economy Rules
+
+1.  OIL is the primary produced resource.
+2.  RDO is the utility/reward currency.
+3.  SOL is an external reward layer, not the mining resource.
+4.  OIL has no guaranteed SOL conversion.
+5.  RDO has no guaranteed SOL conversion.
+6.  Free players can eventually reach the main economy.
+7.  USD 100 players start faster with a Standard Well.
+8.  Paid entry does not guarantee profit.
+9.  Wells require maintenance.
+10. Minting and upgrades remove resources from circulation.
+11. Higher production must create higher operating costs.
+12. SOL rewards come only from a finite Reward Pool.
+13. Daily SOL claims are capped.
+14. Reward parameters must remain configurable.
+15. Economy numbers must be simulated before blockchain deployment.
+16. Blockchain integration comes after gameplay/economy validation.
+
+------------------------------------------------------------------------
+
+# 17. Economy V1 Values --- Quick Reference
+
+  Parameter               V1 Baseline
+  ----------------------- ------------------------------
+  Free Entry              \$0
+  Paid Entry Target       ≈ USD 100
+  Free Asset              Starter Well
+  Paid Asset              Standard Well
+  Starter Output          5 BBL / 2h
+  Standard Output         30 BBL / 2h
+  Starter Oil Price       1 BBL = 0.01 RDO
+  Standard Mint           100 RDO + 1,000 BBL
+  Max Well Level          LV5
+  Base Durability         100+ depending on class
+  Repair Currency         RDO
+  Starting Free Storage   100 BBL
+  Starting Paid Storage   500 BBL
+  Initial SOL Claim Cap   max 0.05 SOL / account / 24h
+  Guaranteed SOL Return   None
+  Fixed RDO → SOL Rate    None
+  Fixed OIL → SOL Rate    None
+
+------------------------------------------------------------------------
+
+# 18. What Must Be Simulated Before Launch
+
+Before Economy V1 is considered final, simulate at minimum:
+
+-   100 players.
+-   1,000 players.
+-   10,000 players.
+-   Free-to-paid conversion.
+-   Average collections per day.
+-   Average missed cycles.
+-   RDO creation per day.
+-   RDO burn per day.
+-   Repair expenditure.
+-   Upgrade expenditure.
+-   New Well mint frequency.
+-   SOL Reward Pool inflow.
+-   SOL Reward Pool outflow.
+-   Whale/multi-well behaviour.
+-   Multi-account abuse.
+-   30-day, 90-day and 365-day economy projections.
+
+Primary target:
+
+``` text
+RDO Burn + Utility Demand
+must remain meaningful relative to
+RDO Production
+```
+
+External reward target:
+
+``` text
+SOL Outflow
+must never systematically exceed
+the sustainable Reward Pool
+```
+
+------------------------------------------------------------------------
+
+# 19. GitHub Repository Direction
+
+Suggested repository:
+
+``` text
+radas-oil-economy
+```
+
+Initial structure:
+
+``` text
+radas-oil-economy/
+├── README.md
+├── docs/
+│   ├── ECONOMY-V1.md
+│   ├── TOKENOMICS.md
+│   ├── REWARD-POOL.md
+│   └── GAME-LOOP.md
+├── simulation/
+│   └── README.md
+└── LICENSE
+```
+
+This document should initially become:
+
+``` text
+docs/ECONOMY-V1.md
+```
+
+The next development milestone should be an **economy simulator**, not
+blockchain integration.
+
+The simulator should allow the team to change production, cycle time,
+mint cost, repair cost, upgrade cost, player count, free/paid ratio and
+Reward Pool assumptions before any real-value token is deployed.
+
+------------------------------------------------------------------------
+
+## Working Principle
+
+> Build the game economy first. Simulate it second. Validate it with
+> players third. Put real value on-chain only after the system survives
+> those tests.
