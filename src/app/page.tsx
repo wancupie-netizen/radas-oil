@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
+import { WalletConnectButton } from "@/components/wallet-connect-button";
 
 const STORAGE_KEY = "radas-oil-game-state";
 const SAVE_VERSION = 8;
@@ -1332,6 +1333,8 @@ export default function Home() {
         </div>
 
         <div className="hidden items-center gap-2 lg:flex">
+          <WalletConnectButton />
+
           <button className="oil-icon-button">
             <Trophy className="h-5 w-5 text-amber-400" />
           </button>

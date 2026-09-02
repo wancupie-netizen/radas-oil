@@ -1984,7 +1984,7 @@ body {
   top: auto !important;
   height: 96px !important;
   min-height: 96px !important;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .oil-game-layout {
@@ -3097,3 +3097,233 @@ body {
 .oil-promote-button{width:100%;margin-top:11px;padding:11px;border:1px solid rgba(251,191,36,.35);border-radius:8px;background:linear-gradient(180deg,#fbbf24,#c87905);color:#08121c;font-size:10px;font-weight:950;cursor:pointer}
 .oil-promote-button:disabled{cursor:not-allowed;filter:grayscale(.45);opacity:.45}
 .oil-promotion-note{margin:8px 0 0;color:#64748b;font-size:8px;line-height:1.4}
+/* ===== PATCH 024A SOLANA WALLET UI ===== */
+/* Keep wallet dropdown above the fixed game screen. */
+.oil-topbar {
+  z-index: 100 !important;
+}
+
+.radas-wallet-root {
+  position: relative;
+  z-index: 120;
+}
+
+.radas-wallet-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  min-width: 150px;
+  padding: 6px 10px 6px 8px;
+  border: 1px solid rgba(56, 189, 248, .28);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(6, 43, 70, .98), rgba(3, 27, 47, .99));
+  color: #d9f2ff;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.035),
+    0 4px 12px rgba(0,0,0,.18);
+  transition:
+    border-color .16s ease,
+    background .16s ease,
+    transform .16s ease;
+}
+
+.radas-wallet-trigger:hover {
+  border-color: rgba(56, 189, 248, .58);
+  background:
+    linear-gradient(180deg, rgba(8, 54, 86, .99), rgba(3, 33, 56, .99));
+}
+
+.radas-wallet-trigger:active {
+  transform: translateY(1px);
+}
+
+.radas-wallet-trigger.is-connected {
+  border-color: rgba(52, 211, 153, .34);
+}
+
+.radas-wallet-icon,
+.radas-wallet-option-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(56, 189, 248, .20);
+  border-radius: 7px;
+  background: rgba(14, 116, 144, .12);
+  color: #38bdf8;
+}
+
+.radas-wallet-copy {
+  display: flex;
+  min-width: 72px;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+}
+
+.radas-wallet-label {
+  margin-bottom: 4px;
+  color: #7896aa;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .13em;
+  white-space: nowrap;
+}
+
+.radas-wallet-copy strong {
+  color: #f3fbff;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .045em;
+  white-space: nowrap;
+}
+
+.radas-wallet-status {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #64748b;
+  box-shadow: 0 0 0 3px rgba(100,116,139,.08);
+}
+
+.radas-wallet-status.is-online {
+  background: #34d399;
+  box-shadow: 0 0 8px rgba(52,211,153,.65);
+}
+
+.radas-wallet-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 9999;
+  width: 290px;
+  padding: 10px;
+  border: 1px solid rgba(56, 189, 248, .28);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(4, 32, 54, .995), rgba(2, 20, 35, .995));
+  box-shadow:
+    0 20px 45px rgba(0,0,0,.55),
+    inset 0 1px rgba(255,255,255,.035);
+}
+
+.radas-wallet-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 4px 10px;
+  border-bottom: 1px solid rgba(100, 116, 139, .25);
+}
+
+.radas-wallet-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 7px 9px;
+  border: 1px solid rgba(71, 85, 105, .52);
+  border-radius: 8px;
+  background: rgba(7, 30, 49, .82);
+  color: #dcebf4;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  transition:
+    border-color .15s ease,
+    background .15s ease;
+}
+
+.radas-wallet-option:hover {
+  border-color: rgba(56, 189, 248, .48);
+  background: rgba(8, 50, 78, .82);
+}
+
+.radas-wallet-option:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
+.radas-wallet-option-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.radas-wallet-message {
+  padding: 11px;
+  border: 1px solid rgba(71, 85, 105, .42);
+  border-radius: 8px;
+  background: rgba(2, 18, 31, .58);
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.radas-wallet-connected-card {
+  padding: 11px;
+  border: 1px solid rgba(52, 211, 153, .22);
+  border-radius: 8px;
+  background: rgba(16, 185, 129, .055);
+}
+
+.radas-wallet-network {
+  padding: 3px 6px;
+  border: 1px solid rgba(56, 189, 248, .22);
+  border-radius: 4px;
+  background: rgba(14, 165, 233, .08);
+  color: #7dd3fc;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+
+.radas-wallet-disconnect {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid rgba(248, 113, 113, .22);
+  border-radius: 7px;
+  background: rgba(239, 68, 68, .08);
+  color: #fca5a5;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.radas-wallet-disconnect:hover {
+  background: rgba(239, 68, 68, .13);
+}
+
+.radas-wallet-disconnect:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
+.radas-wallet-error {
+  margin-top: 9px;
+  padding: 8px;
+  border: 1px solid rgba(248, 113, 113, .20);
+  border-radius: 7px;
+  background: rgba(239, 68, 68, .08);
+  color: #fca5a5;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+@media (max-width: 1250px) {
+  .radas-wallet-trigger {
+    min-width: 46px;
+    width: 46px;
+    padding: 7px;
+  }
+
+  .radas-wallet-copy,
+  .radas-wallet-status,
+  .radas-wallet-trigger > svg {
+    display: none;
+  }
+}
