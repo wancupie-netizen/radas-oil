@@ -1,0 +1,18 @@
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabasePublishableKey =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+export const supabase =
+  supabaseUrl &&
+  supabasePublishableKey &&
+  supabasePublishableKey !== "PASTE_PUBLISHABLE_KEY_HERE"
+    ? createClient(supabaseUrl, supabasePublishableKey, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+        },
+      })
+    : null;

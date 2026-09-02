@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Activity,
   BarChart3,
@@ -25,8 +25,10 @@ import {
   Wrench,
 } from "lucide-react";
 
+import { supabase } from "@/lib/supabase";
+
 const STORAGE_KEY = "radas-oil-game-state";
-const SAVE_VERSION = 7;
+const SAVE_VERSION = 8;
 
 const LOCAL_PLAYER_ID = "local-player-001";
 
@@ -468,6 +470,10 @@ export default function Home() {
   const [mintOpen, setMintOpen] = useState(false);
   const [progressWellId, setProgressWellId] = useState<number | null>(null);
   const [hasClaimedStarterWell, setHasClaimedStarterWell] = useState(false);
+  const [cloudUserId, setCloudUserId] = useState<string | null>(null);
+  const [cloudReady, setCloudReady] = useState(false);
+  const cloudSaveRef = useRef<GameSave | null>(null);
+  const lastCloudSignatureRef = useRef("");
   const SELL_AMOUNT = 10;
 
   useEffect(() => {
@@ -497,6 +503,115 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (!gameLoaded || !supabase) {
+      return;
+    }
+
+    const supabaseClient = supabase;
+    let cancelled = false;
+
+    async function loadCloudSave() {
+      try {
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabaseClient.auth.getSession();
+
+        if (sessionError) {
+          throw sessionError;
+        }
+
+        let user = session?.user ?? null;
+
+        if (!user) {
+          const {
+            data: anonymousData,
+            error: anonymousError,
+          } = await supabaseClient.auth.signInAnonymously();
+
+          if (anonymousError) {
+            throw anonymousError;
+          }
+
+          user = anonymousData.user;
+        }
+
+        if (!user || cancelled) {
+          return;
+        }
+
+        const { data: row, error: loadError } = await supabaseClient
+          .from("game_saves")
+          .select("save_data")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (loadError) {
+          throw loadError;
+        }
+
+        const localRaw = localStorage.getItem(STORAGE_KEY);
+        let localSavedAt = 0;
+
+        if (localRaw) {
+          try {
+            const parsedLocal = JSON.parse(localRaw) as {
+              savedAt?: unknown;
+            };
+
+            if (typeof parsedLocal.savedAt === "number") {
+              localSavedAt = parsedLocal.savedAt;
+            }
+          } catch {
+            localSavedAt = 0;
+          }
+        }
+
+        const remoteSave =
+          row?.save_data && typeof row.save_data === "object"
+            ? (row.save_data as GameSave)
+            : null;
+
+        const remoteSavedAt =
+          remoteSave && typeof remoteSave.savedAt === "number"
+            ? remoteSave.savedAt
+            : 0;
+
+        if (remoteSave && remoteSavedAt > localSavedAt) {
+          const restored = normalizeGameSave(remoteSave);
+
+          if (restored && !cancelled) {
+            setWells(restored.wells);
+            setStorage(restored.storage);
+            setTokenBalance(restored.tokenBalance);
+            setStorageLevel(restored.storageLevel);
+            setStorageCapacity(restored.storageCapacity);
+            setTransactions(restored.transactions);
+            setStats(restored.stats);
+            setHasClaimedStarterWell(restored.hasClaimedStarterWell);
+          }
+        }
+
+        if (!cancelled) {
+          setCloudUserId(user.id);
+          setCloudReady(true);
+        }
+      } catch (error) {
+        console.warn(
+          "Supabase cloud save unavailable. Continuing with localStorage.",
+          error,
+        );
+      }
+    }
+
+    void loadCloudSave();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [gameLoaded]);
+
+  useEffect(() => {
     if (!gameLoaded) {
       return;
     }
@@ -520,6 +635,8 @@ export default function Home() {
       STORAGE_KEY,
       JSON.stringify(saveData),
     );
+
+    cloudSaveRef.current = saveData;
   }, [
     wells,
     storage,
@@ -531,6 +648,97 @@ export default function Home() {
     hasClaimedStarterWell,
     gameLoaded,
   ]);
+
+  useEffect(() => {
+    if (!gameLoaded || !cloudReady || !cloudUserId || !supabase) {
+      return;
+    }
+
+    const supabaseClient = supabase;
+    let syncing = false;
+
+    async function syncCloudSave() {
+      if (syncing) {
+        return;
+      }
+
+      const saveData = cloudSaveRef.current;
+
+      if (!saveData) {
+        return;
+      }
+
+      const signature = JSON.stringify({
+        wells: saveData.data.wells.map((well) => ({
+          id: well.id,
+          status: well.status,
+          readyAt: well.readyAt,
+          output: well.output,
+          level: well.level,
+          cycleSeconds: well.cycleSeconds,
+          durability: well.durability,
+          maxDurability: well.maxDurability,
+          tier: well.tier,
+          assetId: well.assetId,
+          ownerId: well.ownerId,
+          acquiredAt: well.acquiredAt,
+          acquisitionType: well.acquisitionType,
+        })),
+        storage: saveData.data.storage,
+        tokenBalance: saveData.data.tokenBalance,
+        storageLevel: saveData.data.storageLevel,
+        storageCapacity: saveData.data.storageCapacity,
+        transactions: saveData.data.transactions,
+        stats: saveData.data.stats,
+        hasClaimedStarterWell:
+          saveData.data.hasClaimedStarterWell,
+      });
+
+      if (signature === lastCloudSignatureRef.current) {
+        return;
+      }
+
+      syncing = true;
+
+      try {
+        const { error } = await supabaseClient
+          .from("game_saves")
+          .upsert(
+            {
+              user_id: cloudUserId,
+              save_data: saveData,
+              updated_at: new Date().toISOString(),
+            },
+            {
+              onConflict: "user_id",
+            },
+          );
+
+        if (error) {
+          throw error;
+        }
+
+        lastCloudSignatureRef.current = signature;
+      } catch (error) {
+        console.warn(
+          "Unable to sync RADAS OIL save to Supabase.",
+          error,
+        );
+      } finally {
+        syncing = false;
+      }
+    }
+
+    void syncCloudSave();
+
+    const interval = window.setInterval(() => {
+      void syncCloudSave();
+    }, 5000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [cloudReady, cloudUserId, gameLoaded]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -621,7 +829,7 @@ export default function Home() {
       durability: DEFAULT_MAX_DURABILITY,
       maxDurability: DEFAULT_MAX_DURABILITY,
       tier: "Standard",
-      assetId: `RADAS-WELL-${Date.now()}-${newId}`,
+      assetId: `RADAS-WELL-${Date.now()}-${nextId}`,
       ownerId: LOCAL_PLAYER_ID,
       acquiredAt: Date.now(),
       acquisitionType: "Purchase",
