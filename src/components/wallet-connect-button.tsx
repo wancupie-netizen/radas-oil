@@ -12,6 +12,7 @@ import { useClient } from "@solana/react";
 import { ChevronDown, Wallet } from "lucide-react";
 
 import type { AppSolanaClient } from "@/app/providers";
+import { RdoDevnetMint } from "@/components/rdo-devnet-mint";
 
 function truncateAddress(address: string) {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
@@ -123,6 +124,8 @@ export function WalletConnectButton() {
                   {address}
                 </p>
               </div>
+
+              <RdoDevnetMint />
 
               <button
                 type="button"
