@@ -26,9 +26,106 @@ import {
 } from "lucide-react";
 
 const STORAGE_KEY = "radas-oil-game-state";
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 7;
 
-type WellStatus = "Extracting" | "Ready" | "Locked";
+const LOCAL_PLAYER_ID = "local-player-001";
+
+const TOKEN_SYMBOL = "RDO";
+const OIL_PRICE = 0.1;
+const DURABILITY_LOSS_PER_COLLECTION = 5;
+const REPAIR_COST_PER_POINT = 0.05;
+const DEFAULT_MAX_DURABILITY = 100;
+
+const STARTER_WELL_OUTPUT = 5;
+const STARTER_WELL_CYCLE_SECONDS = 30;
+const STANDARD_WELL_OUTPUT = 30;
+const STANDARD_WELL_CYCLE_SECONDS = 20;
+const STANDARD_WELL_MINT_COST = 100;
+const STANDARD_WELL_USD_REFERENCE = 100;
+
+type WellStatus = "Extracting" | "Ready" | "Locked" | "Damaged";
+type AssetAcquisitionType =
+  | "Genesis"
+  | "Starter Claim"
+  | "Mint"
+  | "Purchase";
+
+type WellTier =
+  | "Starter"
+  | "Standard"
+  | "Industrial"
+  | "Deep Sea"
+  | "Ultra Deep";
+type WellClass = "Starter" | "Common" | "Uncommon" | "Rare" | "Legendary";
+
+const MAX_WELL_LEVEL = 5;
+
+const WELL_CLASS_CONFIG: Record<
+  WellTier,
+  { className: WellClass; baseMintCost: number }
+> = {
+  Starter: { className: "Starter", baseMintCost: 0 },
+  Standard: { className: "Common", baseMintCost: 100 },
+  Industrial: { className: "Uncommon", baseMintCost: 450 },
+  "Deep Sea": { className: "Rare", baseMintCost: 1500 },
+  "Ultra Deep": { className: "Legendary", baseMintCost: 5000 },
+};
+
+const UPGRADE_COST_MULTIPLIERS = [0, 0.25, 0.5, 1, 2];
+const UPGRADE_OUTPUT_MULTIPLIERS = [0, 0.15, 0.2, 0.25, 0.35];
+const UPGRADE_CYCLE_MULTIPLIERS = [0, 0, 0.05, 0.05, 0.1];
+
+const WELL_PROMOTION_CONFIG: Partial<
+  Record<WellTier, {
+    nextTier: WellTier;
+    rdoCost: number;
+    oilCost: number;
+    output: number;
+    cycleSeconds: number;
+    maxDurability: number;
+  }>
+> = {
+  Standard: {
+    nextTier: "Industrial",
+    rdoCost: 450,
+    oilCost: 5000,
+    output: 75,
+    cycleSeconds: 18,
+    maxDurability: 120,
+  },
+  Industrial: {
+    nextTier: "Deep Sea",
+    rdoCost: 1500,
+    oilCost: 15000,
+    output: 180,
+    cycleSeconds: 16,
+    maxDurability: 150,
+  },
+  "Deep Sea": {
+    nextTier: "Ultra Deep",
+    rdoCost: 5000,
+    oilCost: 50000,
+    output: 450,
+    cycleSeconds: 14,
+    maxDurability: 200,
+  },
+};
+
+function getWellPromotion(well: Well) {
+  if (well.level < MAX_WELL_LEVEL) return null;
+  return WELL_PROMOTION_CONFIG[well.tier] ?? null;
+}
+
+function getWellClass(tier: WellTier): WellClass {
+  return WELL_CLASS_CONFIG[tier].className;
+}
+
+function getWellUpgradeCost(well: Well) {
+  if (well.level >= MAX_WELL_LEVEL) return 0;
+  const base = WELL_CLASS_CONFIG[well.tier].baseMintCost;
+  if (base <= 0) return 0;
+  return Math.ceil(base * UPGRADE_COST_MULTIPLIERS[well.level]);
+}
 
 type GameSaveData = {
   wells: Well[];
@@ -38,6 +135,7 @@ type GameSaveData = {
   storageCapacity: number;
   transactions: Transaction[];
   stats: PlayerStats;
+  hasClaimedStarterWell: boolean;
 };
 
 type GameSave = {
@@ -70,6 +168,13 @@ type Well = {
   output: number;
   level: number;
   cycleSeconds: number;
+  durability: number;
+  maxDurability: number;
+  tier: WellTier;
+  assetId: string;
+  ownerId: string;
+  acquiredAt: number;
+  acquisitionType: AssetAcquisitionType;
 };
 
 const INITIAL_WELLS: Well[] = [
@@ -82,6 +187,13 @@ const INITIAL_WELLS: Well[] = [
     output: 10,
     level: 1,
     cycleSeconds: 20,
+    durability: DEFAULT_MAX_DURABILITY,
+    maxDurability: DEFAULT_MAX_DURABILITY,
+    tier: "Standard",
+    assetId: "RADAS-WELL-000001",
+    ownerId: LOCAL_PLAYER_ID,
+    acquiredAt: Date.now(),
+    acquisitionType: "Genesis",
   },
   {
     id: 2,
@@ -92,6 +204,13 @@ const INITIAL_WELLS: Well[] = [
     output: 10,
     level: 1,
     cycleSeconds: 20,
+    durability: DEFAULT_MAX_DURABILITY,
+    maxDurability: DEFAULT_MAX_DURABILITY,
+    tier: "Standard",
+    assetId: "RADAS-WELL-000002",
+    ownerId: LOCAL_PLAYER_ID,
+    acquiredAt: Date.now(),
+    acquisitionType: "Genesis",
   },
   {
     id: 3,
@@ -102,6 +221,13 @@ const INITIAL_WELLS: Well[] = [
     output: 10,
     level: 1,
     cycleSeconds: 20,
+    durability: DEFAULT_MAX_DURABILITY,
+    maxDurability: DEFAULT_MAX_DURABILITY,
+    tier: "Standard",
+    assetId: "RADAS-WELL-000003",
+    ownerId: LOCAL_PLAYER_ID,
+    acquiredAt: Date.now(),
+    acquisitionType: "Genesis",
   },
 ];
 
@@ -136,13 +262,14 @@ function normalizeGameSave(raw: unknown): GameSaveData | null {
     const status: WellStatus =
       well.status === "Ready" ||
       well.status === "Locked" ||
+      well.status === "Damaged" ||
       well.status === "Extracting"
         ? well.status
         : "Ready";
 
     const level =
       typeof well.level === "number" && well.level > 0
-        ? well.level
+        ? Math.min(MAX_WELL_LEVEL, Math.floor(well.level))
         : 1;
 
     const cycleSeconds =
@@ -177,6 +304,47 @@ function normalizeGameSave(raw: unknown): GameSaveData | null {
       output,
       level,
       cycleSeconds,
+      durability:
+        typeof well.durability === "number"
+          ? Math.min(
+              DEFAULT_MAX_DURABILITY,
+              Math.max(0, well.durability),
+            )
+          : DEFAULT_MAX_DURABILITY,
+      maxDurability:
+        typeof well.maxDurability === "number" &&
+        well.maxDurability > 0
+          ? well.maxDurability
+          : DEFAULT_MAX_DURABILITY,
+      tier:
+        well.tier === "Starter" ||
+        well.tier === "Standard" ||
+        well.tier === "Industrial" ||
+        well.tier === "Deep Sea" ||
+        well.tier === "Ultra Deep"
+          ? well.tier
+          : "Standard",
+      assetId:
+        typeof well.assetId === "string" && well.assetId.length > 0
+          ? well.assetId
+          : `RADAS-WELL-${String(
+              typeof well.id === "number" ? well.id : index + 1,
+            ).padStart(6, "0")}`,
+      ownerId:
+        typeof well.ownerId === "string" && well.ownerId.length > 0
+          ? well.ownerId
+          : LOCAL_PLAYER_ID,
+      acquiredAt:
+        typeof well.acquiredAt === "number" && well.acquiredAt > 0
+          ? well.acquiredAt
+          : Date.now(),
+      acquisitionType:
+        well.acquisitionType === "Starter Claim" ||
+        well.acquisitionType === "Mint" ||
+        well.acquisitionType === "Purchase" ||
+        well.acquisitionType === "Genesis"
+          ? well.acquisitionType
+          : "Genesis",
     };
 
     if (baseWell.status !== "Extracting") {
@@ -246,6 +414,11 @@ function normalizeGameSave(raw: unknown): GameSaveData | null {
       ? (source.transactions as Transaction[]).slice(0, 20)
       : [],
 
+    hasClaimedStarterWell:
+      typeof source.hasClaimedStarterWell === "boolean"
+        ? source.hasClaimedStarterWell
+        : false,
+
     stats: {
       totalOilProduced:
         typeof rawStats.totalOilProduced === "number"
@@ -292,7 +465,9 @@ export default function Home() {
     totalTokenSpent: 0,
   });
   const [gameLoaded, setGameLoaded] = useState(false);
-  const OIL_PRICE = 2.4;
+  const [mintOpen, setMintOpen] = useState(false);
+  const [progressWellId, setProgressWellId] = useState<number | null>(null);
+  const [hasClaimedStarterWell, setHasClaimedStarterWell] = useState(false);
   const SELL_AMOUNT = 10;
 
   useEffect(() => {
@@ -311,6 +486,7 @@ export default function Home() {
           setStorageCapacity(restored.storageCapacity);
           setTransactions(restored.transactions);
           setStats(restored.stats);
+          setHasClaimedStarterWell(restored.hasClaimedStarterWell);
         }
       } catch {
         console.warn("Unable to load saved RADAS OIL game state.");
@@ -336,6 +512,7 @@ export default function Home() {
         storageCapacity,
         transactions,
         stats,
+        hasClaimedStarterWell,
       },
     };
 
@@ -351,6 +528,7 @@ export default function Home() {
     storageCapacity,
     transactions,
     stats,
+    hasClaimedStarterWell,
     gameLoaded,
   ]);
 
@@ -440,6 +618,13 @@ export default function Home() {
       output: 10,
       level: 1,
       cycleSeconds: 20,
+      durability: DEFAULT_MAX_DURABILITY,
+      maxDurability: DEFAULT_MAX_DURABILITY,
+      tier: "Standard",
+      assetId: `RADAS-WELL-${Date.now()}-${newId}`,
+      ownerId: LOCAL_PLAYER_ID,
+      acquiredAt: Date.now(),
+      acquisitionType: "Purchase",
     };
 
     setTokenBalance((current) => current - cost);
@@ -450,6 +635,76 @@ export default function Home() {
       `Purchased ${newWell.name}`,
       cost,
     );
+  }
+
+  function createMintedWell(tier: WellTier) {
+    const nextId =
+      wells.length > 0
+        ? Math.max(...wells.map((well) => well.id)) + 1
+        : 1;
+
+    const nextLetter = String.fromCharCode(
+      65 + ((nextId - 1) % 26),
+    );
+
+    const isStarter = tier === "Starter";
+    const cycleSeconds = isStarter
+      ? STARTER_WELL_CYCLE_SECONDS
+      : STANDARD_WELL_CYCLE_SECONDS;
+
+    const newWell: Well = {
+      id: nextId,
+      name: `Well ${nextLetter}-${String(nextId).padStart(2, "0")}`,
+      status: "Extracting",
+      secondsLeft: cycleSeconds,
+      readyAt: Date.now() + cycleSeconds * 1000,
+      output: isStarter
+        ? STARTER_WELL_OUTPUT
+        : STANDARD_WELL_OUTPUT,
+      level: 1,
+      cycleSeconds,
+      durability: DEFAULT_MAX_DURABILITY,
+      maxDurability: DEFAULT_MAX_DURABILITY,
+      tier,
+      assetId: `RADAS-WELL-${Date.now()}-${nextId}`,
+      ownerId: LOCAL_PLAYER_ID,
+      acquiredAt: Date.now(),
+      acquisitionType: isStarter ? "Starter Claim" : "Mint",
+    };
+
+    setWells((current) => [...current, newWell]);
+
+    return newWell;
+  }
+
+  function mintStarterWell() {
+    if (hasClaimedStarterWell) {
+      return;
+    }
+
+    createMintedWell("Starter");
+    setHasClaimedStarterWell(true);
+    setMintOpen(false);
+  }
+
+  function mintStandardWell() {
+    if (tokenBalance < STANDARD_WELL_MINT_COST) {
+      return;
+    }
+
+    const newWell = createMintedWell("Standard");
+
+    setTokenBalance(
+      (current) => current - STANDARD_WELL_MINT_COST,
+    );
+
+    addTransaction(
+      "expense",
+      `Minted ${newWell.name} Standard Well`,
+      STANDARD_WELL_MINT_COST,
+    );
+
+    setMintOpen(false);
   }
 
   function upgradeStorage() {
@@ -471,49 +726,103 @@ export default function Home() {
   }
 
   function upgradeWell(wellId: number) {
-    const well = wells.find(
-      (item) => item.id === wellId,
-    );
+    const well = wells.find((item) => item.id === wellId);
 
-    if (!well || well.status === "Locked") {
+    if (
+      !well ||
+      well.status === "Locked" ||
+      well.status === "Damaged" ||
+      well.level >= MAX_WELL_LEVEL
+    ) {
       return;
     }
 
-    const upgradeCost = well.level * 25;
+    const upgradeCost = getWellUpgradeCost(well);
 
-    if (tokenBalance < upgradeCost) {
+    if (upgradeCost <= 0 || tokenBalance < upgradeCost) {
       return;
     }
 
-    setTokenBalance(
-      (current) => current - upgradeCost,
+    const outputMultiplier = UPGRADE_OUTPUT_MULTIPLIERS[well.level];
+    const cycleMultiplier = UPGRADE_CYCLE_MULTIPLIERS[well.level];
+    const nextLevel = well.level + 1;
+    const nextOutput = Math.max(
+      well.output + 1,
+      Math.ceil(well.output * (1 + outputMultiplier)),
     );
+    const nextCycleSeconds = Math.max(
+      8,
+      Math.round(well.cycleSeconds * (1 - cycleMultiplier)),
+    );
+
+    setTokenBalance((current) => current - upgradeCost);
 
     setWells((currentWells) =>
       currentWells.map((item) => {
-        if (item.id !== wellId) {
-          return item;
-        }
+        if (item.id !== wellId) return item;
 
-        const nextCycleSeconds = Math.max(
-          10,
-          item.cycleSeconds - 2,
-        );
+        const extracting = item.status === "Extracting";
 
         return {
           ...item,
-          level: item.level + 1,
-          output: item.output + 5,
+          level: nextLevel,
+          output: nextOutput,
           cycleSeconds: nextCycleSeconds,
+          secondsLeft: extracting ? nextCycleSeconds : item.secondsLeft,
+          readyAt: extracting
+            ? Date.now() + nextCycleSeconds * 1000
+            : item.readyAt,
         };
       }),
     );
 
     addTransaction(
       "expense",
-      `${well.name} upgraded to Level ${well.level + 1}`,
+      `${well.name} upgraded to Level ${nextLevel}`,
       upgradeCost,
     );
+  }
+  function promoteWell(wellId: number) {
+    const well = wells.find((item) => item.id === wellId);
+    if (
+      !well ||
+      well.status === "Locked" ||
+      well.status === "Damaged" ||
+      well.level < MAX_WELL_LEVEL
+    ) return;
+
+    const promotion = getWellPromotion(well);
+    if (!promotion) return;
+    if (tokenBalance < promotion.rdoCost || storage < promotion.oilCost) return;
+
+    setTokenBalance((current) => current - promotion.rdoCost);
+    setStorage((current) => current - promotion.oilCost);
+
+    setWells((current) =>
+      current.map((item) =>
+        item.id !== wellId
+          ? item
+          : {
+              ...item,
+              tier: promotion.nextTier,
+              level: 1,
+              output: promotion.output,
+              cycleSeconds: promotion.cycleSeconds,
+              secondsLeft: promotion.cycleSeconds,
+              readyAt: Date.now() + promotion.cycleSeconds * 1000,
+              durability: promotion.maxDurability,
+              maxDurability: promotion.maxDurability,
+              status: "Extracting",
+            },
+      ),
+    );
+
+    addTransaction(
+      "expense",
+      `${well.name} promoted to ${promotion.nextTier}`,
+      promotion.rdoCost,
+    );
+    setProgressWellId(null);
   }
 
   function unlockWell(wellId: number) {
@@ -554,6 +863,50 @@ export default function Home() {
       "expense",
       `Unlocked ${well.name}`,
       unlockCost,
+    );
+  }
+
+  function repairWell(wellId: number) {
+    const well = wells.find((item) => item.id === wellId);
+
+    if (!well || well.status !== "Damaged") {
+      return;
+    }
+
+    const missingDurability = Math.max(
+      0,
+      well.maxDurability - well.durability,
+    );
+
+    const repairCost = Math.max(
+      1,
+      Math.ceil(missingDurability * REPAIR_COST_PER_POINT),
+    );
+
+    if (tokenBalance < repairCost) {
+      return;
+    }
+
+    setTokenBalance((current) => current - repairCost);
+
+    setWells((currentWells) =>
+      currentWells.map((item) =>
+        item.id === wellId
+          ? {
+              ...item,
+              durability: item.maxDurability,
+              status: "Extracting",
+              secondsLeft: item.cycleSeconds,
+              readyAt: Date.now() + item.cycleSeconds * 1000,
+            }
+          : item,
+      ),
+    );
+
+    addTransaction(
+      "expense",
+      `Repaired ${well.name}`,
+      repairCost,
     );
   }
 
@@ -629,21 +982,53 @@ export default function Home() {
         current.totalOilProduced + well.output,
     }));
 
+    const nextDurability = Math.max(
+      0,
+      well.durability - DURABILITY_LOSS_PER_COLLECTION,
+    );
+
     setWells((currentWells) =>
       currentWells.map((item) =>
         item.id === wellId
-          ? {
-              ...item,
-              status: "Extracting",
-              secondsLeft: item.cycleSeconds,
-              readyAt:
-                Date.now() +
-                item.cycleSeconds * 1000,
-            }
+          ? nextDurability === 0
+            ? {
+                ...item,
+                durability: 0,
+                status: "Damaged",
+                secondsLeft: 0,
+                readyAt: null,
+              }
+            : {
+                ...item,
+                durability: nextDurability,
+                status: "Extracting",
+                secondsLeft: item.cycleSeconds,
+                readyAt:
+                  Date.now() +
+                  item.cycleSeconds * 1000,
+              }
           : item,
       ),
     );
   }
+
+  const progressWell =
+    progressWellId === null
+      ? null
+      : wells.find((well) => well.id === progressWellId) ?? null;
+
+  const progressUpgradeCost = progressWell
+    ? getWellUpgradeCost(progressWell)
+    : 0;
+
+  const progressPromotion = progressWell
+    ? getWellPromotion(progressWell)
+    : null;
+
+  const canAffordPromotion =
+    progressPromotion !== null &&
+    tokenBalance >= progressPromotion.rdoCost &&
+    storage >= progressPromotion.oilCost;
 
   const newWellCost =
     (wells.length + 1) * 25;
@@ -652,7 +1037,9 @@ export default function Home() {
     tokenBalance >= newWellCost;
 
   const activeWells = wells.filter(
-    (well) => well.status !== "Locked",
+    (well) =>
+      well.status !== "Locked" &&
+      well.status !== "Damaged",
   );
 
   const totalOutput = activeWells.reduce(
@@ -699,7 +1086,7 @@ export default function Home() {
           <div className="oil-resource-card">
             <Coins className="h-7 w-7 text-amber-400" />
             <div>
-              <p>TOKEN</p>
+              <p>RDO TOKEN</p>
               <strong>{tokenBalance.toFixed(2)}</strong>
             </div>
           </div>
@@ -720,7 +1107,7 @@ export default function Home() {
               <p>OIL VALUE</p>
               <strong>
                 {(storage * OIL_PRICE).toFixed(2)}{" "}
-                <span>TOKEN</span>
+                <span>RDO</span>
               </strong>
             </div>
           </div>
@@ -916,7 +1303,7 @@ export default function Home() {
                     </p>
 
                     <p className="mt-1 text-xs font-bold text-emerald-400">
-                      TOKEN / BBL
+                      RDO / BBL
                     </p>
                   </div>
 
@@ -945,6 +1332,17 @@ export default function Home() {
                 {wells.slice(0, 3).map((well) => {
                   const isReady = well.status === "Ready";
                   const isLocked = well.status === "Locked";
+                  const isDamaged = well.status === "Damaged";
+                  const missingDurability = Math.max(
+                    0,
+                    well.maxDurability - well.durability,
+                  );
+                  const repairCost = Math.max(
+                    1,
+                    Math.ceil(
+                      missingDurability * REPAIR_COST_PER_POINT,
+                    ),
+                  );
                   const storageFull =
                     isReady && storage + well.output > storageCapacity;
 
@@ -953,7 +1351,7 @@ export default function Home() {
                       key={well.id}
                       className={`oil-dock-well ${
                         isReady ? "oil-dock-well-ready" : ""
-                      }`}
+                      } ${isDamaged ? "oil-dock-well-damaged" : ""}`}
                     >
                       <div className="oil-dock-well-visual">
                         <img
@@ -965,9 +1363,11 @@ export default function Home() {
                           className={`oil-dock-status ${
                             isLocked
                               ? "oil-dock-status-locked"
-                              : isReady
-                                ? "oil-dock-status-ready"
-                                : "oil-dock-status-active"
+                              : isDamaged
+                                ? "oil-dock-status-damaged"
+                                : isReady
+                                  ? "oil-dock-status-ready"
+                                  : "oil-dock-status-active"
                           }`}
                         />
                       </div>
@@ -975,7 +1375,16 @@ export default function Home() {
                       <div className="oil-dock-well-head">
                         <div>
                           <p>{well.name.toUpperCase()}</p>
-                          <span>LV.{well.level}</span>
+                          <span>
+                            {well.tier.toUpperCase()} / LV.{well.level}
+                          </span>
+                          <em
+                            className={`oil-well-class oil-well-class-${getWellClass(
+                              well.tier,
+                            ).toLowerCase().replace(" ", "-")}`}
+                          >
+                            {getWellClass(well.tier)}
+                          </em>
                         </div>
                       </div>
 
@@ -985,47 +1394,98 @@ export default function Home() {
                           <small>
                             {isLocked
                               ? "LOCKED"
-                              : isReady
-                                ? "READY TO COLLECT"
-                                : formatTime(well.secondsLeft)}
+                              : isDamaged
+                                ? "REPAIR REQUIRED"
+                                : isReady
+                                  ? "READY TO COLLECT"
+                                  : formatTime(well.secondsLeft)}
                           </small>
+
+                          {!isLocked && (
+                            <div className="oil-dock-durability">
+                              <span>
+                                DURABILITY {well.durability}/{well.maxDurability}
+                              </span>
+                              <div>
+                                <i
+                                  style={{
+                                    width: `${Math.max(
+                                      0,
+                                      Math.min(
+                                        100,
+                                        (well.durability / well.maxDurability) * 100,
+                                      ),
+                                    )}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 
                       <button
+                        className="oil-dock-upgrade-button"
+                        onClick={() => setProgressWellId(well.id)}
+                        disabled={isLocked}
+                      >
+                        {well.level >= MAX_WELL_LEVEL
+                          ? getWellPromotion(well)
+                            ? "PROMOTE CLASS"
+                            : "MAX CLASS"
+                          : `UPGRADE LV.${well.level + 1}`}
+                      </button>
+
+                      <button
                         onClick={() =>
-                          isLocked ? unlockWell(well.id) : collectOil(well.id)
+                          isLocked
+                            ? unlockWell(well.id)
+                            : isDamaged
+                              ? repairWell(well.id)
+                              : collectOil(well.id)
                         }
                         disabled={
                           isLocked
                             ? tokenBalance < 50
-                            : !isReady || storageFull
+                            : isDamaged
+                              ? tokenBalance < repairCost
+                              : !isReady || storageFull
                         }
-                        className={isReady && !storageFull ? "is-ready" : ""}
+                        className={
+                          isDamaged
+                            ? "is-repair"
+                            : isReady && !storageFull
+                              ? "is-ready"
+                              : ""
+                        }
                       >
                         {isLocked
                           ? tokenBalance >= 50
-                            ? "UNLOCK - 50"
-                            : "NEED 50 TOKEN"
-                          : storageFull
-                            ? "STORAGE FULL"
-                            : isReady
-                              ? "COLLECT"
-                              : "EXTRACTING"}
+                            ? "UNLOCK - 50 RDO"
+                            : "NEED 50 RDO"
+                          : isDamaged
+                            ? tokenBalance >= repairCost
+                              ? `REPAIR - ${repairCost} RDO`
+                              : `NEED ${repairCost} RDO`
+                            : storageFull
+                              ? "STORAGE FULL"
+                              : isReady
+                                ? "COLLECT"
+                                : "EXTRACTING"}
                       </button>
                     </article>
                   );
                 })}
 
                 <article className="oil-dock-new-well">
-                  <button onClick={buyNewWell} disabled={!canBuyWell}>
+                  <button onClick={() => setMintOpen(true)}>
                     <div className="oil-dock-new-well-icon">
                       <img src="/oil-pumpjack-icon.svg" alt="" />
                       <span>+</span>
                     </div>
-                    <strong>NEW WELL</strong>
-                    <small>{newWellCost} TOKEN</small>
-                    <b>BUY WELL</b>
+                    <strong>MINT WELL</strong>
+                    <small>STARTER / STANDARD</small>
+                    <b>OPEN MINT</b>
                   </button>
                 </article>
               </div>
@@ -1041,7 +1501,7 @@ export default function Home() {
 
                 <div className="oil-dock-sell-price">
                   <span>MARKET PRICE</span>
-                  <strong>{OIL_PRICE.toFixed(2)} TOKEN / BBL</strong>
+                  <strong>{OIL_PRICE.toFixed(2)} RDO / BBL</strong>
                 </div>
 
                 <div className="oil-dock-sell-actions">
@@ -1054,6 +1514,262 @@ export default function Home() {
                 </div>
               </aside>
             </div>
+
+            {progressWell && (
+              <div
+                className="oil-progress-backdrop"
+                onClick={() => setProgressWellId(null)}
+              >
+                <section
+                  className="oil-progress-modal"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="oil-progress-header">
+                    <div>
+                      <small>WELL PROGRESSION</small>
+                      <h2>{progressWell.name}</h2>
+                    </div>
+                    <button onClick={() => setProgressWellId(null)}>
+                      CLOSE
+                    </button>
+                  </div>
+
+                  <div className="oil-progress-body">
+                    <img
+                      className="oil-progress-rig"
+                      src="/oil-pumpjack-icon.svg"
+                      alt=""
+                    />
+
+                    <div className="oil-progress-title">
+                      <span>{progressWell.tier.toUpperCase()} WELL</span>
+                      <strong>{getWellClass(progressWell.tier)}</strong>
+                      <b>LV.{progressWell.level} / {MAX_WELL_LEVEL}</b>
+                    </div>
+
+                    <div
+                      style={{
+                        margin: "0 0 10px",
+                        padding: "7px 9px",
+                        border: "1px solid rgba(34, 211, 238, .12)",
+                        borderRadius: "7px",
+                        background: "rgba(2, 6, 23, .24)",
+                        fontSize: "8px",
+                        color: "#64748b",
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      <div>
+                        ASSET ID:{" "}
+                        <strong style={{ color: "#94a3b8" }}>
+                          {progressWell.assetId}
+                        </strong>
+                      </div>
+                      <div>
+                        OWNER:{" "}
+                        <strong style={{ color: "#22d3ee" }}>
+                          {progressWell.ownerId === LOCAL_PLAYER_ID
+                            ? "YOU / LOCAL PLAYER"
+                            : progressWell.ownerId}
+                        </strong>
+                        {"  |  "}
+                        ACQUIRED:{" "}
+                        <strong style={{ color: "#94a3b8" }}>
+                          {progressWell.acquisitionType.toUpperCase()}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div className="oil-progress-stats">
+                      <div>
+                        <small>OUTPUT</small>
+                        <strong>{progressWell.output} BBL</strong>
+                      </div>
+                      <div>
+                        <small>CYCLE</small>
+                        <strong>{progressWell.cycleSeconds}s</strong>
+                      </div>
+                      <div>
+                        <small>DURABILITY</small>
+                        <strong>
+                          {progressWell.durability}/{progressWell.maxDurability}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {progressWell.level < MAX_WELL_LEVEL ? (
+                      <>
+                        <div className="oil-progress-next">
+                          <span>NEXT LV.{progressWell.level + 1}</span>
+                          <span>
+                            +{Math.round(
+                              UPGRADE_OUTPUT_MULTIPLIERS[progressWell.level] *
+                                100,
+                            )}% OUTPUT
+                          </span>
+                          <span>
+                            {UPGRADE_CYCLE_MULTIPLIERS[progressWell.level] > 0
+                              ? `-${Math.round(
+                                  UPGRADE_CYCLE_MULTIPLIERS[
+                                    progressWell.level
+                                  ] * 100,
+                                )}% CYCLE`
+                              : "CYCLE UNCHANGED"}
+                          </span>
+                        </div>
+
+                        <button
+                          className="oil-progress-upgrade"
+                          onClick={() => upgradeWell(progressWell.id)}
+                          disabled={
+                            progressUpgradeCost <= 0 ||
+                            tokenBalance < progressUpgradeCost ||
+                            progressWell.status === "Damaged"
+                          }
+                        >
+                          {progressWell.status === "Damaged"
+                            ? "REPAIR WELL FIRST"
+                            : progressUpgradeCost <= 0
+                              ? "STARTER UPGRADE LOCKED"
+                              : tokenBalance >= progressUpgradeCost
+                                ? `UPGRADE - ${progressUpgradeCost} RDO`
+                                : `NEED ${progressUpgradeCost} RDO`}
+                        </button>
+                      </>
+                    ) : progressPromotion ? (
+                      <div className="oil-promotion-zone">
+                        <div className="oil-promotion-heading">
+                          <small>CLASS PROMOTION READY</small>
+                          <strong>
+                            {getWellClass(progressWell.tier)}
+                            {" -> "}
+                            {getWellClass(progressPromotion.nextTier)}
+                          </strong>
+                          <span>
+                            {progressWell.tier.toUpperCase()}
+                            {" -> "}
+                            {progressPromotion.nextTier.toUpperCase()}
+                          </span>
+                        </div>
+
+                        <div className="oil-promotion-preview">
+                          <div><small>NEW OUTPUT</small><strong>{progressPromotion.output} BBL</strong></div>
+                          <div><small>NEW CYCLE</small><strong>{progressPromotion.cycleSeconds}s</strong></div>
+                          <div><small>MAX DURABILITY</small><strong>{progressPromotion.maxDurability}</strong></div>
+                        </div>
+
+                        <div className="oil-promotion-cost">
+                          <span>{progressPromotion.rdoCost.toLocaleString()} RDO</span>
+                          <span>{progressPromotion.oilCost.toLocaleString()} BBL</span>
+                        </div>
+
+                        <button
+                          className="oil-promote-button"
+                          onClick={() => promoteWell(progressWell.id)}
+                          disabled={!canAffordPromotion}
+                        >
+                          {canAffordPromotion
+                            ? `PROMOTE TO ${getWellClass(progressPromotion.nextTier).toUpperCase()}`
+                            : "INSUFFICIENT RDO / OIL"}
+                        </button>
+
+                        <p className="oil-promotion-note">
+                          Promotion resets this Well to LV.1 of the new production class.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="oil-progress-max">
+                        LEGENDARY CLASS / MAX PROGRESSION
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {mintOpen && (
+              <div
+                className="oil-mint-backdrop"
+                onClick={() => setMintOpen(false)}
+              >
+                <section
+                  className="oil-mint-modal"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="oil-mint-header">
+                    <div>
+                      <small>RADAS ASSET MINT</small>
+                      <h2>MINT WELL</h2>
+                    </div>
+                    <button onClick={() => setMintOpen(false)}>
+                      CLOSE
+                    </button>
+                  </div>
+
+                  <div className="oil-mint-grid">
+                    <article className="oil-mint-card">
+                      <div className="oil-mint-rig">
+                        <img src="/oil-pumpjack-icon.svg" alt="" />
+                      </div>
+
+                      <span className="oil-mint-tier">STARTER WELL</span>
+                      <strong>FREE</strong>
+
+                      <div className="oil-mint-stats">
+                        <span>{STARTER_WELL_OUTPUT} BBL / CYCLE</span>
+                        <span>{STARTER_WELL_CYCLE_SECONDS}s CYCLE</span>
+                        <span>100 DURABILITY</span>
+                        <span>CLASS: STARTER</span>
+                      </div>
+
+                      <button
+                        onClick={mintStarterWell}
+                        disabled={hasClaimedStarterWell}
+                      >
+                        {hasClaimedStarterWell
+                          ? "STARTER CLAIMED"
+                          : "CLAIM FREE WELL"}
+                      </button>
+
+                      <p>One free Starter Well per player.</p>
+                    </article>
+
+                    <article className="oil-mint-card oil-mint-card-standard">
+                      <div className="oil-mint-rig">
+                        <img src="/oil-pumpjack-icon.svg" alt="" />
+                      </div>
+
+                      <span className="oil-mint-tier">STANDARD WELL</span>
+                      <strong>
+                        USD {STANDARD_WELL_USD_REFERENCE}
+                      </strong>
+
+                      <div className="oil-mint-stats">
+                        <span>{STANDARD_WELL_OUTPUT} BBL / CYCLE</span>
+                        <span>{STANDARD_WELL_CYCLE_SECONDS}s CYCLE</span>
+                        <span>100 DURABILITY</span>
+                        <span>CLASS: COMMON</span>
+                      </div>
+
+                      <button
+                        onClick={mintStandardWell}
+                        disabled={tokenBalance < STANDARD_WELL_MINT_COST}
+                      >
+                        {tokenBalance >= STANDARD_WELL_MINT_COST
+                          ? `MINT - ${STANDARD_WELL_MINT_COST} RDO`
+                          : `NEED ${STANDARD_WELL_MINT_COST} RDO`}
+                      </button>
+
+                      <p>
+                        USD100 is the target paid tier. V1 uses
+                        {` ${STANDARD_WELL_MINT_COST} RDO `}
+                        as the local prototype mint cost.
+                      </p>
+                    </article>
+                  </div>
+                </section>
+              </div>
+            )}
           </div>
 
           {/* PLAYER STATS */}

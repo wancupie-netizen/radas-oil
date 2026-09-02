@@ -2829,3 +2829,271 @@ body {
     height: 96px !important;
   }
 }
+/* ===== PATCH 017+018 TOKEN ECONOMY + DURABILITY ===== */
+
+.oil-dock-well-damaged {
+  border-color: rgba(251, 146, 60, .72) !important;
+  box-shadow:
+    0 0 0 1px rgba(251, 146, 60, .10),
+    0 12px 28px rgba(0, 0, 0, .32) !important;
+}
+
+.oil-dock-status-damaged {
+  background: #fb923c !important;
+  box-shadow: 0 0 11px rgba(251, 146, 60, .9) !important;
+}
+
+.oil-dock-durability {
+  width: 100%;
+  margin-top: 7px;
+}
+
+.oil-dock-durability > span {
+  display: block;
+  margin-bottom: 3px;
+  color: #94a3b8;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: .055em;
+}
+
+.oil-dock-durability > div {
+  width: 100%;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, .28);
+}
+
+.oil-dock-durability > div > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #fb923c, #facc15, #34d399);
+  transition: width .2s ease;
+}
+
+.oil-dock-well > button.is-repair {
+  background: linear-gradient(180deg, #f59e0b, #c76b05) !important;
+  color: #fff !important;
+}
+
+.oil-dock-well-damaged .oil-dock-well-body strong {
+  color: #fdba74;
+}
+
+/* ===== PATCH 019 MINT WELL ===== */
+
+.oil-dock-durability > span {
+  font-size: 10px !important;
+}
+
+.oil-dock-durability > div {
+  height: 6px !important;
+}
+
+.oil-mint-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 8, 16, .72);
+  backdrop-filter: blur(7px);
+}
+
+.oil-mint-modal {
+  width: min(720px, 100%);
+  overflow: hidden;
+  border: 1px solid rgba(125, 211, 252, .32);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(4, 34, 55, .99), rgba(2, 18, 31, .99));
+  box-shadow: 0 28px 70px rgba(0, 0, 0, .58);
+}
+
+.oil-mint-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(125, 211, 252, .16);
+}
+
+.oil-mint-header small {
+  display: block;
+  color: #7dd3fc;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .14em;
+}
+
+.oil-mint-header h2 {
+  margin: 3px 0 0;
+  font-size: 24px;
+  font-weight: 950;
+}
+
+.oil-mint-header button {
+  padding: 8px 11px;
+  border: 1px solid rgba(148, 163, 184, .22);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, .72);
+  color: #cbd5e1;
+  font-size: 9px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.oil-mint-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 18px;
+}
+
+.oil-mint-card {
+  position: relative;
+  padding: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(125, 211, 252, .18);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(8, 47, 73, .72), rgba(3, 25, 41, .90));
+}
+
+.oil-mint-card-standard {
+  border-color: rgba(251, 191, 36, .35);
+}
+
+.oil-mint-rig {
+  height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.oil-mint-rig img {
+  width: 145px;
+  height: 145px;
+  object-fit: contain;
+}
+
+.oil-mint-tier {
+  display: block;
+  color: #7dd3fc;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: .12em;
+}
+
+.oil-mint-card-standard .oil-mint-tier {
+  color: #fbbf24;
+}
+
+.oil-mint-card > strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.oil-mint-stats {
+  display: grid;
+  gap: 5px;
+  margin-top: 14px;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, .18);
+}
+
+.oil-mint-stats span {
+  color: #cbd5e1;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.oil-mint-card > button {
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #38bdf8, #1679a8);
+  color: white;
+  font-size: 10px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.oil-mint-card-standard > button {
+  background: linear-gradient(180deg, #fbbf24, #c87905);
+  color: #08121c;
+}
+
+.oil-mint-card > button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.oil-mint-card > p {
+  min-height: 32px;
+  margin: 9px 0 0;
+  color: #7890a1;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+@media (max-width: 700px) {
+  .oil-mint-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .oil-mint-modal {
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+}
+/* ===== PATCH 020A: UPGRADE PROGRESSION + WELL CLASS ===== */
+.oil-well-class{display:inline-flex;width:fit-content;margin-top:3px;padding:2px 6px;border:1px solid rgba(147,197,253,.34);border-radius:999px;background:rgba(15,23,42,.58);color:#dbeafe;font-size:8px;font-style:normal;font-weight:950;letter-spacing:.08em;text-transform:uppercase}
+.oil-well-class-starter{color:#cbd5e1}
+.oil-well-class-uncommon{color:#86efac;border-color:rgba(74,222,128,.38)}
+.oil-well-class-rare{color:#c4b5fd;border-color:rgba(167,139,250,.40)}
+.oil-well-class-legendary{color:#fcd34d;border-color:rgba(251,191,36,.45)}
+.oil-dock-upgrade-button{width:100%;margin:4px 0;padding:5px 6px!important;border:1px solid rgba(56,189,248,.30)!important;border-radius:6px!important;background:rgba(3,105,161,.18)!important;color:#7dd3fc!important;font-size:9px!important;font-weight:950!important}
+.oil-progress-backdrop{position:absolute;inset:0;z-index:110;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,8,16,.76);backdrop-filter:blur(8px)}
+.oil-progress-modal{width:min(470px,100%);border:1px solid rgba(56,189,248,.30);border-radius:14px;background:linear-gradient(180deg,rgba(5,38,61,.99),rgba(2,18,31,.99));box-shadow:0 28px 70px rgba(0,0,0,.62);overflow:hidden}
+.oil-progress-header{display:flex;align-items:center;justify-content:space-between;padding:17px 19px;border-bottom:1px solid rgba(125,211,252,.14)}
+.oil-progress-header small{color:#7dd3fc;font-size:9px;font-weight:950;letter-spacing:.14em}
+.oil-progress-header h2{margin:3px 0 0;font-size:22px;font-weight:950}
+.oil-progress-header button{padding:7px 10px;border:1px solid rgba(148,163,184,.22);border-radius:7px;background:rgba(15,23,42,.72);color:#cbd5e1;font-size:9px;font-weight:900}
+.oil-progress-body{padding:18px;text-align:center}
+.oil-progress-rig{width:150px;height:110px;object-fit:contain}
+.oil-progress-title span{display:block;color:#7dd3fc;font-size:9px;font-weight:950;letter-spacing:.12em}
+.oil-progress-title strong{display:block;margin-top:4px;font-size:25px}
+.oil-progress-title b{display:block;margin-top:5px;color:#94a3b8;font-size:11px}
+.oil-progress-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:15px}
+.oil-progress-stats>div{padding:10px 7px;border:1px solid rgba(148,163,184,.12);border-radius:8px;background:rgba(0,0,0,.18)}
+.oil-progress-stats small{display:block;color:#64748b;font-size:8px;font-weight:900}
+.oil-progress-stats strong{display:block;margin-top:3px;color:#e2e8f0;font-size:12px}
+.oil-progress-next{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:13px}
+.oil-progress-next span{padding:5px 7px;border-radius:5px;background:rgba(14,116,144,.16);color:#a5f3fc;font-size:8px;font-weight:900}
+.oil-progress-upgrade{width:100%;margin-top:14px;padding:11px;border:0;border-radius:8px;background:linear-gradient(180deg,#38bdf8,#1679a8);color:#fff;font-size:11px;font-weight:950}
+.oil-progress-upgrade:disabled{opacity:.42}
+.oil-progress-max{margin-top:15px;padding:11px;border:1px solid rgba(251,191,36,.30);border-radius:8px;background:rgba(146,64,14,.16);color:#fcd34d;font-size:11px;font-weight:950}
+/* ===== PATCH 021 WELL CLASS PROMOTION ===== */
+.oil-promotion-zone{margin-top:15px;padding:13px;border:1px solid rgba(251,191,36,.30);border-radius:10px;background:linear-gradient(180deg,rgba(120,53,15,.20),rgba(15,23,42,.34))}
+.oil-promotion-heading small{display:block;color:#fbbf24;font-size:8px;font-weight:950;letter-spacing:.13em}
+.oil-promotion-heading strong{display:block;margin-top:5px;color:#fef3c7;font-size:18px;font-weight:950}
+.oil-promotion-heading span{display:block;margin-top:4px;color:#94a3b8;font-size:8px;font-weight:900}
+.oil-promotion-preview{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}
+.oil-promotion-preview>div{padding:8px 5px;border:1px solid rgba(251,191,36,.13);border-radius:7px;background:rgba(0,0,0,.20)}
+.oil-promotion-preview small{display:block;color:#64748b;font-size:7px;font-weight:900}
+.oil-promotion-preview strong{display:block;margin-top:3px;color:#e2e8f0;font-size:11px}
+.oil-promotion-cost{display:flex;justify-content:center;gap:8px;margin-top:11px}
+.oil-promotion-cost span{padding:5px 9px;border-radius:6px;background:rgba(2,132,199,.14);color:#bae6fd;font-size:9px;font-weight:950}
+.oil-promote-button{width:100%;margin-top:11px;padding:11px;border:1px solid rgba(251,191,36,.35);border-radius:8px;background:linear-gradient(180deg,#fbbf24,#c87905);color:#08121c;font-size:10px;font-weight:950;cursor:pointer}
+.oil-promote-button:disabled{cursor:not-allowed;filter:grayscale(.45);opacity:.45}
+.oil-promotion-note{margin:8px 0 0;color:#64748b;font-size:8px;line-height:1.4}
