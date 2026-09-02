@@ -54,7 +54,6 @@ export function RdoDevnetMint() {
         decimals: RDO_DECIMALS,
         mintAuthority: connected.signer.address,
         freezeAuthority: null,
-        tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
       });
 
       const result = await client.sendTransaction([
