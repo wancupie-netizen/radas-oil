@@ -5,8 +5,11 @@ import { address, generateKeyPairSigner } from "@solana/kit";
 import { getCreateAccountInstruction } from "@solana-program/system";
 import {
   TOKEN_2022_PROGRAM_ADDRESS,
+  findAssociatedTokenPda,
+  getCreateAssociatedTokenIdempotentInstructionAsync,
   getInitializeMintInstruction,
   getMintSize,
+  getMintToInstruction,
 } from "@solana-program/token-2022";
 import { useClient } from "@solana/react";
 import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
@@ -15,6 +18,10 @@ import { getCreateV1InstructionAsync, TokenStandard } from "@metaplex-foundation
 import type { AppSolanaClient } from "@/app/providers";
 
 const RDO_DECIMALS = 6;
+const RDO_TEST_MINT_AMOUNT = 1_000;
+const RDO_TEST_MINT_RAW_AMOUNT =
+  BigInt(RDO_TEST_MINT_AMOUNT) *
+  BigInt(10) ** BigInt(RDO_DECIMALS);
 
 const RDO_MINT_ADDRESS =
   "6XTX38gi4mUZ63SMqT4XUmi6CGk9zQY4hwAWFUuDmd9y";
@@ -32,6 +39,9 @@ export function RdoDevnetMint() {
   const [error, setError] = useState<string | null>(null);
   const [registeringMetadata, setRegisteringMetadata] = useState(false);
   const [metadataSignature, setMetadataSignature] = useState<string | null>(null);
+  const [mintingTestSupply, setMintingTestSupply] = useState(false);
+  const [testSupplySignature, setTestSupplySignature] = useState<string | null>(null);
+  const [rdoTokenAccount, setRdoTokenAccount] = useState<string | null>(null);
 
   async function createRdoMint() {
     if (!connected?.signer || creating || mintAddress) {
@@ -153,6 +163,80 @@ export function RdoDevnetMint() {
     }
   }
 
+  async function mintRdoTestSupply() {
+    if (
+      !connected?.signer ||
+      mintingTestSupply ||
+      testSupplySignature
+    ) {
+      return;
+    }
+
+    setMintingTestSupply(true);
+    setError(null);
+
+    try {
+      const rdoMint = address(RDO_MINT_ADDRESS);
+
+      const [associatedTokenAddress] =
+        await findAssociatedTokenPda({
+          owner: connected.signer.address,
+          tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
+          mint: rdoMint,
+        });
+
+      const createAtaInstruction =
+        await getCreateAssociatedTokenIdempotentInstructionAsync({
+          payer: connected.signer,
+          ata: associatedTokenAddress,
+          owner: connected.signer.address,
+          mint: rdoMint,
+          tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
+        });
+
+      const mintToInstruction = getMintToInstruction({
+        mint: rdoMint,
+        token: associatedTokenAddress,
+        mintAuthority: connected.signer,
+        amount: RDO_TEST_MINT_RAW_AMOUNT,
+      });
+
+      const result = await client.sendTransaction([
+        createAtaInstruction,
+        mintToInstruction,
+      ]);
+
+      setRdoTokenAccount(String(associatedTokenAddress));
+      setTestSupplySignature(String(result.context.signature));
+    } catch (cause) {
+      console.error("RDO test supply mint failed:", cause);
+
+      let current: unknown = cause;
+
+      for (let depth = 0; depth < 8 && current; depth += 1) {
+        console.error(`RDO mint cause ${depth}:`, current);
+
+        if (
+          typeof current === "object" &&
+          current !== null &&
+          "cause" in current
+        ) {
+          current = (current as { cause?: unknown }).cause;
+        } else {
+          break;
+        }
+      }
+
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : String(cause),
+      );
+    } finally {
+      setMintingTestSupply(false);
+    }
+  }
+
   if (!connected) {
     return null;
   }
@@ -239,6 +323,49 @@ export function RdoDevnetMint() {
             {registeringMetadata
               ? "REGISTERING METADATA..."
               : "REGISTER RDO METADATA"}
+          </button>
+        )}
+      </div>
+
+      <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+        <div className="mb-2">
+          <p className="text-[9px] font-black uppercase tracking-[0.12em] text-amber-300">
+            RDO Test Supply
+          </p>
+
+          <p className="mt-1 text-[9px] leading-4 text-slate-500">
+            Mint exactly 1,000 RDO to the connected Devnet wallet.
+          </p>
+        </div>
+
+        {testSupplySignature ? (
+          <div className="rounded border border-emerald-500/20 bg-emerald-500/5 p-2">
+            <p className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-400">
+              1,000 RDO Minted
+            </p>
+
+            {rdoTokenAccount ? (
+              <p className="mt-2 break-all font-mono text-[9px] leading-4 text-slate-400">
+                ATA: {rdoTokenAccount}
+              </p>
+            ) : null}
+
+            <p className="mt-2 break-all font-mono text-[9px] leading-4 text-slate-500">
+              TX: {testSupplySignature}
+            </p>
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={mintingTestSupply}
+            onClick={() => {
+              void mintRdoTestSupply();
+            }}
+            className="w-full rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-amber-300 transition hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {mintingTestSupply
+              ? "MINTING 1,000 RDO..."
+              : "MINT 1,000 RDO TEST SUPPLY"}
           </button>
         )}
       </div>
