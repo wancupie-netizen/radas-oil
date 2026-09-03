@@ -27,6 +27,7 @@ import {
 
 import { supabase } from "@/lib/supabase";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
+import { RdoRewardClaim } from "@/components/rdo-reward-claim";
 
 const STORAGE_KEY = "radas-oil-game-state";
 const SAVE_VERSION = 9;
@@ -1205,6 +1206,33 @@ export default function Home() {
     );
   }
 
+  function completeStandaloneRdoClaim(
+    amount: number,
+    signature: string,
+    walletAddress: string,
+  ) {
+    const safeAmount = Math.min(Math.max(0, amount), claimableRdo, tokenBalance);
+    if (safeAmount <= 0) return;
+
+    const now = Date.now();
+    setClaimableRdo((current) => Math.max(0, current - safeAmount));
+    setClaimedRdo((current) => current + safeAmount);
+    setTokenBalance((current) => Math.max(0, current - safeAmount));
+
+    const completedClaim: RewardClaim = {
+      id: `claim-${now}-${Math.random().toString(36).slice(2, 8)}`,
+      amount: safeAmount,
+      createdAt: now,
+      status: "completed",
+      signature,
+      walletAddress,
+    };
+
+    setClaimHistory((current) =>
+      [completedClaim, ...current].slice(0, 20),
+    );
+  }
+
   function sellOil() {
     executeSale(SELL_AMOUNT);
   }
@@ -1389,6 +1417,27 @@ export default function Home() {
 
         <div className="hidden items-center gap-2 lg:flex">
           <WalletConnectButton />
+
+          <div
+            className="relative z-[100] flex min-w-[190px] items-center gap-2 rounded-xl border border-emerald-400/40 bg-[#07111f] px-3 py-2 shadow-xl"
+            data-rdo-standalone-claim="true"
+          >
+            <div className="min-w-0">
+              <div className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-400">
+                RDO Claim
+              </div>
+              <div className="text-[9px] font-bold text-slate-400">
+                {claimableRdo.toFixed(2)} RDO available
+              </div>
+            </div>
+
+            <div className="ml-auto min-w-[112px]">
+              <RdoRewardClaim
+                claimableRdo={claimableRdo}
+                onClaimCompleted={completeStandaloneRdoClaim}
+              />
+            </div>
+          </div>
 
           <button className="oil-icon-button">
             <Trophy className="h-5 w-5 text-amber-400" />

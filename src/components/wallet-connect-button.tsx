@@ -27,13 +27,19 @@ export function WalletConnectButton() {
   const disconnect = useDisconnect(client);
 
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const address = connected
-    ? String(connected.account.address)
-    : null;
+  const address =
+    mounted && connected
+      ? String(connected.account.address)
+      : null;
 
   const error = connect.error ?? disconnect.error;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -81,8 +87,9 @@ export function WalletConnectButton() {
           <strong>
             {address
               ? truncateAddress(address)
-              : status === "connecting" ||
-                  status === "reconnecting"
+              : mounted &&
+                  (status === "connecting" ||
+                    status === "reconnecting")
                 ? "CONNECTING..."
                 : "CONNECT"}
           </strong>
@@ -105,7 +112,7 @@ export function WalletConnectButton() {
 
       {open ? (
         <div className="radas-wallet-menu" role="menu">
-          {connected && address ? (
+          {mounted && connected && address ? (
             <div className="space-y-3">
               <div className="radas-wallet-connected-card">
                 <div className="flex items-center justify-between gap-3">
@@ -156,7 +163,7 @@ export function WalletConnectButton() {
               </div>
 
               <div className="mt-2 space-y-2">
-                {status === "pending" ? (
+                {!mounted || status === "pending" ? (
                   <p className="radas-wallet-message">
                     Detecting installed wallets...
                   </p>
