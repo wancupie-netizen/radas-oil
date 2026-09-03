@@ -29,7 +29,7 @@ import { supabase } from "@/lib/supabase";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
 
 const STORAGE_KEY = "radas-oil-game-state";
-const SAVE_VERSION = 8;
+const SAVE_VERSION = 9;
 
 const LOCAL_PLAYER_ID = "local-player-001";
 
@@ -134,6 +134,9 @@ type GameSaveData = {
   wells: Well[];
   storage: number;
   tokenBalance: number;
+  claimableRdo: number;
+  claimedRdo: number;
+  claimHistory: RewardClaim[];
   storageLevel: number;
   storageCapacity: number;
   transactions: Transaction[];
@@ -145,6 +148,15 @@ type GameSave = {
   version: number;
   savedAt: number;
   data: GameSaveData;
+};
+
+type RewardClaim = {
+  id: string;
+  amount: number;
+  createdAt: number;
+  status: "pending" | "completed" | "failed";
+  signature: string | null;
+  walletAddress: string | null;
 };
 
 type Transaction = {
@@ -403,6 +415,22 @@ function normalizeGameSave(raw: unknown): GameSaveData | null {
         ? Math.max(0, source.tokenBalance)
         : 100,
 
+    // Patch 026A: only RDO earned from oil sales after this migration
+    // becomes claimable. Legacy/default balances remain internal-only.
+    claimableRdo:
+      typeof source.claimableRdo === "number"
+        ? Math.max(0, source.claimableRdo)
+        : 0,
+
+    claimedRdo:
+      typeof source.claimedRdo === "number"
+        ? Math.max(0, source.claimedRdo)
+        : 0,
+
+    claimHistory: Array.isArray(source.claimHistory)
+      ? (source.claimHistory as RewardClaim[]).slice(0, 20)
+      : [],
+
     storageLevel:
       typeof source.storageLevel === "number"
         ? Math.max(1, source.storageLevel)
@@ -457,6 +485,9 @@ export default function Home() {
   const [wells, setWells] = useState<Well[]>(INITIAL_WELLS);
   const [storage, setStorage] = useState(25);
   const [tokenBalance, setTokenBalance] = useState(100);
+  const [claimableRdo, setClaimableRdo] = useState(0);
+  const [claimedRdo, setClaimedRdo] = useState(0);
+  const [claimHistory, setClaimHistory] = useState<RewardClaim[]>([]);
   const [storageLevel, setStorageLevel] = useState(1);
   const [storageCapacity, setStorageCapacity] = useState(100);
   const [sellAmount, setSellAmount] = useState("10");
@@ -489,6 +520,9 @@ export default function Home() {
           setWells(restored.wells);
           setStorage(restored.storage);
           setTokenBalance(restored.tokenBalance);
+          setClaimableRdo(restored.claimableRdo);
+          setClaimedRdo(restored.claimedRdo);
+          setClaimHistory(restored.claimHistory);
           setStorageLevel(restored.storageLevel);
           setStorageCapacity(restored.storageCapacity);
           setTransactions(restored.transactions);
@@ -585,6 +619,9 @@ export default function Home() {
             setWells(restored.wells);
             setStorage(restored.storage);
             setTokenBalance(restored.tokenBalance);
+            setClaimableRdo(restored.claimableRdo);
+            setClaimedRdo(restored.claimedRdo);
+            setClaimHistory(restored.claimHistory);
             setStorageLevel(restored.storageLevel);
             setStorageCapacity(restored.storageCapacity);
             setTransactions(restored.transactions);
@@ -624,6 +661,9 @@ export default function Home() {
         wells,
         storage,
         tokenBalance,
+        claimableRdo,
+        claimedRdo,
+        claimHistory,
         storageLevel,
         storageCapacity,
         transactions,
@@ -642,6 +682,9 @@ export default function Home() {
     wells,
     storage,
     tokenBalance,
+    claimableRdo,
+    claimedRdo,
+    claimHistory,
     storageLevel,
     storageCapacity,
     transactions,
@@ -687,6 +730,9 @@ export default function Home() {
         })),
         storage: saveData.data.storage,
         tokenBalance: saveData.data.tokenBalance,
+        claimableRdo: saveData.data.claimableRdo,
+        claimedRdo: saveData.data.claimedRdo,
+        claimHistory: saveData.data.claimHistory,
         storageLevel: saveData.data.storageLevel,
         storageCapacity: saveData.data.storageCapacity,
         transactions: saveData.data.transactions,
@@ -1142,6 +1188,12 @@ export default function Home() {
       (current) => current + saleValue,
     );
 
+    // Patch 026A: new oil-sale earnings are eligible for future
+    // on-chain RDO claims. Existing/default RDO is not migrated here.
+    setClaimableRdo(
+      (current) => current + saleValue,
+    );
+
     setStorage(
       (current) => current - barrels,
     );
@@ -1297,6 +1349,9 @@ export default function Home() {
             <div>
               <p>RDO TOKEN</p>
               <strong>{tokenBalance.toFixed(2)}</strong>
+              <span className="mt-1 block text-[9px] font-bold text-emerald-400">
+                CLAIMABLE {claimableRdo.toFixed(2)} RDO
+              </span>
             </div>
           </div>
 
